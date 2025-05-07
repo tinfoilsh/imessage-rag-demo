@@ -1,38 +1,26 @@
-# Tinfoil Secure iMessage RAG Demo
+# Tinfoil Secure Text RAG
 
-This project demonstrates how to use Tinfoil to build a secure RAG pipeline for iMessage.
+## Build
 
-## Prerequisites
-
-- Python 3.12+
-- macOS (for iMessage access)
-- [imessage-exporter](https://github.com/ReagentX/imessage-exporter)
-
-## Setup
-
-1. Clone this repository:
 ```bash
-git clone https://github.com/tinfoilsh/imessage-rag-demo
-cd imessage-rag-demo
+docker build -t tinfoil-chat-rag .
 ```
 
-2. Create and activate a virtual environment:
+## Embedding
+
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+docker run --rm -it \
+    -e TINFOIL_API_KEY=none \
+    -v $(pwd)/signal-chat.json:/chat.json \
+    -v $(pwd)/vdb:/db \
+    tinfoil-chat-rag --db /db --format signal --file /chat.json
 ```
 
-3. Install imessage-exporter:
-```bash
-git clone https://github.com/ReagentX/imessage-exporter.git
-cargo build --release
-./target/release/imessage-exporter --format txt
+## Inference
+
 ```
-
-## Processing and Embedding Messages
-
-1. Process the exported messages and create embeddings:
-```bash
-python main.py --file texts.txt
+docker run --rm -it \
+    -e TINFOIL_API_KEY=none \
+    -v $(pwd)/vdb:/db \
+    tinfoil-chat-rag --db /db
 ```
