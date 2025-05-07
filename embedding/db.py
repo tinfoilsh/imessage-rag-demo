@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict
 import chromadb
-from chromadb.utils import embedding_functions
+from embedding.tinfoil_embedding import TinfoilAIEmbeddingFunction
 
 
 def get_embedding_collection(chroma_dir: str, tinfoil_api_key: str) -> chromadb.Collection:
@@ -12,9 +12,10 @@ def get_embedding_collection(chroma_dir: str, tinfoil_api_key: str) -> chromadb.
     os.makedirs(chroma_dir, exist_ok=True)
     chroma_client = chromadb.PersistentClient(path=chroma_dir)
 
-    openai_ef = embedding_functions.OpenAIEmbeddingFunction(
+    tinfoil_ef = TinfoilAIEmbeddingFunction(
         api_key=tinfoil_api_key,
-        api_base="https://nomic-embed-text.model.tinfoil.sh/v1",
+        enclave="nomic-embed-text.model.tinfoil.sh",
+        repo="tinfoilsh/confidential-nomic-embed-text",
         model_name="nomic-embed-text"
     )
 
@@ -23,12 +24,12 @@ def get_embedding_collection(chroma_dir: str, tinfoil_api_key: str) -> chromadb.
     try:
         collection = chroma_client.get_collection(
             name=COLLECTION_NAME,
-            embedding_function=openai_ef
+            embedding_function=tinfoil_ef
         )
     except:
         collection = chroma_client.create_collection(
             name=COLLECTION_NAME,
-            embedding_function=openai_ef
+            embedding_function=tinfoil_ef
         )
         print(f"Created new collection {COLLECTION_NAME}")
 
@@ -54,7 +55,7 @@ def add_chunks_to_chroma(collection: chromadb.Collection, chunks):
         batch_texts = texts[i:i+batch_size]
         batch_metadatas = metadatas[i:i+batch_size]
 
-        print(f"Adding {len(batch_ids)} chunks to ChromaDB (batch {i//batch_size + 1}/{(len(ids)-1)//batch_size + 1})")
+        print(f"Adding {len(batch_ids)} chunks (batch {i//batch_size + 1}/{(len(ids)-1)//batch_size + 1})")
         
         collection.add(
             ids=batch_ids,
