@@ -2,10 +2,16 @@ import os
 from typing import Dict, Any
 import chromadb
 from tinfoil import TinfoilAI
+#from openai import OpenAI
+
 
 from embedding import chunk_messages
 from embedding.db import get_embedding_collection, add_chunks_to_chroma, query_messages
 from embedding.parsers import parse_imessage, parse_signal
+
+# client = OpenAI(
+#     api_key=os.getenv("OPENAI_API_KEY"),
+# )
 
 TINFOIL_API_KEY = os.getenv("TINFOIL_API_KEY")
 
@@ -23,24 +29,24 @@ def respond(query_results: Dict[str, Any], question: str) -> None:
     context = "\n\n".join(formatted_contexts)
 
     prompt = f"""
-You are analyzing text messages from the user.
+You are analyzing text messages from the group discussion between the four co-founders of Tinfoil.
 Based on the following excerpts, please answer this question: {question}
 
 EXCERPTS:
 {context}
 
 Please provide a concise answer based only on the information in these excerpts.
-Think critically and give the user a rough, unfiltered, and brutally honest answer to the question. Be concise.
-Do not include anything about sex, drugs, crime, or anything that is not related to the question. Do not include any names of people.
+Think critically and give the user a rough, unfiltered, and brutally honest answer to the question. Be concise and to the point, extremely short replies, less than 50 words.
 """
 
     stream = client.chat.completions.create(
         model="llama3-3-70b",
         messages=[
-            {"role": "system", "content": "You are a helpful assistant analyzing text messages."},
+            {"role": "system", "content": "You are a helpful assistant analyzing text messages bwtween the four co-founders of Tinfoil."},
             {"role": "user", "content": prompt}
         ],
-        stream=True
+        stream=True,
+	seed: 123456
     )
     
     for chunk in stream:
