@@ -1,24 +1,24 @@
 import os
+from typing import Any, Dict
 import chromadb
 from chromadb.utils import embedding_functions
 
-COLLECTION_NAME = "text_messages"
-PERSIST_DIRECTORY = "./chroma_db"
 
-def get_embedding_collection():
+def get_embedding_collection(chroma_dir: str, tinfoil_api_key: str) -> chromadb.Collection:
     """
     Get or create a ChromaDB collection with the OpenAI embedding function.
-    
-    Returns:
-        ChromaDB collection
     """
-    os.makedirs(PERSIST_DIRECTORY, exist_ok=True)
-    chroma_client = chromadb.PersistentClient(path=PERSIST_DIRECTORY)
+
+    os.makedirs(chroma_dir, exist_ok=True)
+    chroma_client = chromadb.PersistentClient(path=chroma_dir)
+
     openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-        api_key="tinfoil",
-        api_base="http://localhost:11434/v1",
+        api_key=tinfoil_api_key,
+        api_base="https://nomic-embed-text.model.tinfoil.sh/v1",
         model_name="nomic-embed-text"
     )
+
+    COLLECTION_NAME = "text_messages"
 
     try:
         collection = chroma_client.get_collection(
@@ -30,11 +30,11 @@ def get_embedding_collection():
             name=COLLECTION_NAME,
             embedding_function=openai_ef
         )
-        print(f"Created new collection '{COLLECTION_NAME}'.")
-    
+        print(f"Created new collection {COLLECTION_NAME}")
+
     return collection
 
-def add_chunks_to_chroma(collection, chunks):
+def add_chunks_to_chroma(collection: chromadb.Collection, chunks):
     """
     Add message chunks to ChromaDB.
     
@@ -42,7 +42,7 @@ def add_chunks_to_chroma(collection, chunks):
         collection: ChromaDB collection
         chunks: List of chunk dictionaries
     """
-    # Prepare data for ChromaDB
+
     ids = [chunk['id'] for chunk in chunks]
     texts = [chunk['text'] for chunk in chunks]
     metadatas = [chunk['metadata'] for chunk in chunks]
@@ -62,7 +62,7 @@ def add_chunks_to_chroma(collection, chunks):
             metadatas=batch_metadatas
         )
 
-def query_messages(collection, question: str, n_results: int = 5):
+def query_messages(collection, question: str, n_results: int = 5) -> Dict[str, Any]:
     """
     Query the message database with a natural language question.
     
