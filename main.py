@@ -1,13 +1,14 @@
 import os
-from typing import Dict, Any
+from typing import Dict, Any, List
 import chromadb
 from tinfoil import TinfoilAI
 #from openai import OpenAI
-
+import argparse
 
 from embedding import chunk_messages
 from embedding.db import get_embedding_collection, add_chunks_to_chroma, query_messages
 from embedding.parsers import parse_imessage, parse_signal
+from server import run_server
 
 # client = OpenAI(
 #     api_key=os.getenv("OPENAI_API_KEY"),
@@ -21,7 +22,7 @@ client = TinfoilAI(
     api_key=TINFOIL_API_KEY,
 )
 
-def respond(query_results: Dict[str, Any], question: str) -> None:
+def create_chat_response(query_results: Dict[str, Any], question: str):
     formatted_contexts = []
     for doc, meta in zip(query_results['documents'], query_results['metadatas']):
         formatted_contexts.append(doc)
@@ -49,6 +50,10 @@ Think critically and give the user a rough, unfiltered, and brutally honest answ
 	seed: 123456
     )
     
+    return stream
+
+def respond(query_results: Dict[str, Any], question: str) -> None:
+    stream = create_chat_response(query_results, question)
     for chunk in stream:
         if chunk.choices[0].delta.content:
             print(chunk.choices[0].delta.content, end="", flush=True)
@@ -73,18 +78,19 @@ def interactive_query(collection: chromadb.Collection, print_excerpts: bool = Fa
 
 
 if __name__ == "__main__":
-    import argparse
-
     parser = argparse.ArgumentParser(description="Text Message RAG Pipeline")
     parser.add_argument('--file', type=str, help='Path to the text message file')
     parser.add_argument('--format', type=str, choices=['imessage', 'signal'], help='Format of the input file (imessage or signal)')
     parser.add_argument('--excerpts', action='store_true', help='Print excerpts')
     parser.add_argument('--db', type=str, required=True, help='Path to the ChromaDB directory')
+    parser.add_argument('--listen', type=int, default=0, help='Port to run the server on (default: none)')
     args = parser.parse_args()
 
     collection = get_embedding_collection(args.db, TINFOIL_API_KEY)
 
-    if args.file:
+    if args.listen > 0:
+        run_server(args.listen, collection, create_chat_response)
+    elif args.file:
         if args.format == "":
             raise ValueError("Format is required")
         elif args.format == "imessage":
