@@ -1,10 +1,7 @@
 import re
-import os
-import json
-import sys
 from datetime import datetime
-from typing import List, Dict, Any, Tuple
-from tinfoil import TinfoilAI
+from typing import List, Dict, Any
+from openai import OpenAI
 from embeddings import get_embedding_collection, add_chunks_to_chroma, query_messages
 
 COLLECTION_NAME = "text_messages"
@@ -12,10 +9,10 @@ CHUNK_SIZE = 10  # Number of messages to chunk together
 OVERLAP = 2  # Number of messages to overlap between chunks
 
 MODEL = "llama3-3-70b"
-client = TinfoilAI(
-    enclave="llama3-3-70b.model.tinfoil.sh",
-    repo="tinfoilsh/confidential-llama3-3-70b",
-    api_key=os.getenv("TINFOIL_API_KEY"),
+
+client = OpenAI(
+    base_url="https://llama3-3-70b.model.tinfoil.sh/v1"
+    api_key="tinfoil",
 )
 
 collection = get_embedding_collection()
@@ -32,33 +29,33 @@ def parse_text_messages(file_path: str) -> List[Dict[str, Any]]:
     """
     with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
-    
+
     # Split by empty lines to get message blocks
     message_blocks = re.split(r'\n\n+', content)
     messages = []
-    
+
     for block in message_blocks:
         if not block.strip():
             continue
-        
+
         lines = block.strip().split('\n')
         if len(lines) < 2:
             continue
-        
+
         # Extract timestamp, read status
         timestamp_line = lines[0]
         timestamp_match = re.match(r'(.*?)(\(Read.*\))?$', timestamp_line)
-        
+
         if timestamp_match:
             timestamp_str = timestamp_match.group(1).strip()
             read_status = timestamp_match.group(2) if timestamp_match.group(2) else None
-            
+
             # Parse timestamp
             try:
                 timestamp = datetime.strptime(timestamp_str, '%b %d, %Y %I:%M:%S %p')
             except ValueError:
                 timestamp = None
-                
+
             # Extract sender
             sender = lines[1].strip()
             
@@ -107,14 +104,14 @@ def chunk_messages(messages: List[Dict[str, Any]], chunk_size: int = CHUNK_SIZE,
             sender = "You" if msg['is_me'] else "Other"
             timestamp = msg['timestamp_str']
             formatted_messages.append(f"[{timestamp}] {sender}: {msg['content']}")
-        
+
         chunk_text = "\n".join(formatted_messages)
-        
+
         # Create a timestamp range for the chunk ID
         start_time = chunk_messages[0]['timestamp_str']
         end_time = chunk_messages[-1]['timestamp_str']
         chunk_id = f"chunk_{i}_{start_time}_{end_time}".replace(" ", "_").replace(":", "-")
-        
+
         # Create chunk metadata
         metadata = {
             'start_time': start_time,
@@ -122,13 +119,13 @@ def chunk_messages(messages: List[Dict[str, Any]], chunk_size: int = CHUNK_SIZE,
             'message_count': len(chunk_messages),
             'senders': ','.join(set([msg['sender'] for msg in chunk_messages])),
         }
-        
+
         chunks.append({
             'id': chunk_id,
             'text': chunk_text,
             'metadata': metadata
         })
-    
+
     return chunks
 
 
@@ -174,7 +171,9 @@ Based on the following excerpts, please answer this question: {question}
 EXCERPTS:
 {context}
 
-Please provide a concise answer based only on the information in these excerpts. Think critically and give the user a rough, unfiltered, and brutally honest answer to the question.
+Please provide a concise answer based only on the information in these excerpts.
+Think critically and give the user a rough, unfiltered, and brutally honest answer to the question. Be concise.
+Do not include anything about sex, drugs, crime, or anything that is not related to the question. Do not include any names of people.
 """
 
     stream = client.chat.completions.create(
@@ -194,7 +193,7 @@ Please provide a concise answer based only on the information in these excerpts.
     print("\n")
 
 
-def interactive_query(stream: bool = True, print_excerpts: bool = True) -> None:
+def interactive_query(print_excerpts: bool = True) -> None:
     """
     Run an interactive query loop.
     
@@ -222,13 +221,11 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Text Message RAG Pipeline")
     parser.add_argument('--file', type=str, help='Path to the text message file')
-    parser.add_argument('--no-stream', action='store_true', help='Disable streaming responses')
     parser.add_argument('--excerpts', action='store_true', help='Print excerpts')
-    
     args = parser.parse_args()
-    
+
     if args.file:
         msg_count, chunk_count = process_message_file(args.file)
         print(f"Successfully processed {msg_count} messages into {chunk_count} chunks")
     
-    interactive_query(stream=not args.no_stream, print_excerpts=args.excerpts)
+    interactive_query(print_excerpts=args.excerpts)
